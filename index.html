@@ -130,9 +130,7 @@
   <div class="container">
     <div class="header">
       <h1>JLPT N4 Grammar Audio Course</h1>
-      <div class="sub">
-        课程型语法页面｜适合通勤听讲解｜支持停止并记住位置
-      </div>
+      <div class="sub">课程型语法页面｜适合通勤听讲解｜支持停止并记住位置</div>
       <div class="status" id="statusText">当前未播放</div>
       <div class="small" id="resumeInfo">上次记录位置：无</div>
     </div>
@@ -142,7 +140,7 @@
     <div class="controls">
       <button onclick="playCurrent()">▶ 播放当前</button>
       <button onclick="playAllFromCurrent()">⏭ 从当前连续播放</button>
-      <button class="secondary" onclick="pauseSpeech()">⏸ 暂停</button>
+      <button class="secondary" onclick="pauseSpeech()">⏸ 暂停 / 继续</button>
       <button class="danger" onclick="stopSpeech()">⏹ 停止并记录</button>
       <button class="secondary" onclick="resumeLastPosition()">▶ 继续上次位置</button>
       <button class="secondary" onclick="prevCard()">⬅ 上一个</button>
@@ -155,7 +153,7 @@
       {
         grammar: "〜ている",
         explanation: "表示现在进行时；也可以表示动作结果形成后的持续状态。",
-        note: "使用时要注意，不是所有动词都只表示“正在做”。例如「結婚しています」不是“正在结婚”，而是“已婚状态”。",
+        note: "使用时要注意，不是所有动词都只表示正在做。例如结婚しています不是正在结婚，而是已婚状态。",
         structure: "Vて + いる",
         examples: [
           { ja: "今、本を読んでいます。", zh: "现在正在读书。" },
@@ -166,7 +164,7 @@
       {
         grammar: "〜てみる",
         explanation: "表示尝试做某事，看看结果如何。",
-        note: "这里的「みる」不是单纯的“看”，而是补助动词，表示“试着做”。",
+        note: "这里的みる不是单纯的看，而是补助动词，表示试着做。",
         structure: "Vて + みる",
         examples: [
           { ja: "日本料理を食べてみます。", zh: "试着吃一下日本料理。" },
@@ -177,7 +175,7 @@
       {
         grammar: "〜てしまう",
         explanation: "表示动作做完了；也常带有遗憾、后悔或不小心的语气。",
-        note: "要注意区分单纯过去式和「〜てしまう」。后者往往带有完成感或遗憾感。",
+        note: "要注意区分单纯过去式和てしまう。后者往往带有完成感或遗憾感。",
         structure: "Vて + しまう",
         examples: [
           { ja: "宿題を忘れてしまいました。", zh: "把作业给忘了，很遗憾。" },
@@ -188,7 +186,7 @@
       {
         grammar: "〜ておく",
         explanation: "表示事先做某事，为将来做准备；也可以表示让某状态先保持着。",
-        note: "重点不是动作本身，而是“为了后面方便，先这样处理”。",
+        note: "重点不是动作本身，而是为了后面方便，先这样处理。",
         structure: "Vて + おく",
         examples: [
           { ja: "会議の前に資料をコピーしておきます。", zh: "在会议前先把资料复印好。" },
@@ -199,7 +197,7 @@
       {
         grammar: "〜つもりです",
         explanation: "表示说话人主观上的打算、意图。",
-        note: "这个语法偏主观意志；如果是客观安排或既定计划，常常更适合用「予定です」。",
+        note: "这个语法偏主观意志；如果是客观安排或既定计划，常常更适合用予定です。",
         structure: "V辞書形 + つもりです / Vない形 + つもりです",
         examples: [
           { ja: "来年、日本へ留学するつもりです。", zh: "我打算明年去日本留学。" },
@@ -211,7 +209,8 @@
 
     let currentIndex = 0;
     let autoPlay = false;
-    let paused = false;
+    let currentQueue = [];
+    let currentUtterance = null;
     const storageKey = "jlpt_grammar_last_position";
 
     function renderCards() {
@@ -268,49 +267,79 @@
       }
     }
 
-    function buildSpeechText(item) {
-      let text = `${item.grammar}。`;
-      text += `${item.explanation}。`;
-      text += `使用时要注意，${item.note}。`;
-      text += `句型结构是，${item.structure}。`;
+    function buildSpeechQueue(item) {
+      const queue = [];
+
+      queue.push({ text: item.grammar, lang: "ja-JP" });
+      queue.push({ text: item.explanation, lang: "zh-CN" });
+      queue.push({ text: "使用时要注意：" + item.note, lang: "zh-CN" });
+      queue.push({ text: "句型结构是：" + item.structure, lang: "zh-CN" });
 
       item.examples.forEach((ex, i) => {
-        text += `例句${i + 1}。${ex.ja}。中文意思是，${ex.zh}。`;
+        queue.push({ text: "例句" + (i + 1), lang: "zh-CN" });
+        queue.push({ text: ex.ja, lang: "ja-JP" });
+        queue.push({ text: ex.zh, lang: "zh-CN" });
       });
 
-      return text;
+      return queue;
+    }
+
+    function speakQueue(queue, onComplete) {
+      if (!queue || queue.length === 0) {
+        if (onComplete) onComplete();
+        return;
+      }
+
+      currentQueue = queue.slice();
+
+      const speakNext = () => {
+        if (currentQueue.length === 0) {
+          currentUtterance = null;
+          if (onComplete) onComplete();
+          return;
+        }
+
+        const segment = currentQueue.shift();
+        const utterance = new SpeechSynthesisUtterance(segment.text);
+        utterance.lang = segment.lang;
+        utterance.rate = 0.9;
+
+        currentUtterance = utterance;
+
+        utterance.onend = () => {
+          speakNext();
+        };
+
+        utterance.onerror = () => {
+          speakNext();
+        };
+
+        speechSynthesis.speak(utterance);
+      };
+
+      speakNext();
     }
 
     function playCurrent() {
-      speechSynthesis.cancel();
-      paused = false;
       autoPlay = false;
+      speechSynthesis.cancel();
 
       const item = grammarData[currentIndex];
-      const text = buildSpeechText(item);
+      document.getElementById("statusText").innerText =
+        `正在播放：${currentIndex + 1}. ${item.grammar}`;
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "ja-JP";
-      utterance.rate = 0.9;
-
-      utterance.onstart = () => {
-        document.getElementById("statusText").innerText =
-          `正在播放：${currentIndex + 1}. ${item.grammar}`;
-      };
-
-      utterance.onend = () => {
+      const queue = buildSpeechQueue(item);
+      speakQueue(queue, () => {
         document.getElementById("statusText").innerText =
           `播放完成：${currentIndex + 1}. ${item.grammar}`;
-      };
+      });
 
-      speechSynthesis.speak(utterance);
       savePosition();
     }
 
     function playAllFromCurrent() {
-      speechSynthesis.cancel();
-      paused = false;
       autoPlay = true;
+      speechSynthesis.cancel();
       playSequence(currentIndex);
     }
 
@@ -325,33 +354,23 @@
       savePosition();
 
       const item = grammarData[index];
-      const text = buildSpeechText(item);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "ja-JP";
-      utterance.rate = 0.9;
+      document.getElementById("statusText").innerText =
+        `连续播放中：${index + 1}. ${item.grammar}`;
 
-      utterance.onstart = () => {
-        document.getElementById("statusText").innerText =
-          `连续播放中：${index + 1}. ${item.grammar}`;
-      };
-
-      utterance.onend = () => {
+      const queue = buildSpeechQueue(item);
+      speakQueue(queue, () => {
         if (autoPlay) {
           playSequence(index + 1);
         }
-      };
-
-      speechSynthesis.speak(utterance);
+      });
     }
 
     function pauseSpeech() {
       if (speechSynthesis.speaking && !speechSynthesis.paused) {
         speechSynthesis.pause();
-        paused = true;
         document.getElementById("statusText").innerText = "已暂停";
       } else if (speechSynthesis.paused) {
         speechSynthesis.resume();
-        paused = false;
         document.getElementById("statusText").innerText = "继续播放中";
       }
     }
@@ -359,6 +378,8 @@
     function stopSpeech() {
       autoPlay = false;
       speechSynthesis.cancel();
+      currentQueue = [];
+      currentUtterance = null;
       savePosition();
       document.getElementById("statusText").innerText =
         `已停止，并记录在第 ${currentIndex + 1} 条`;
