@@ -1,156 +1,412 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JLPT N4 Grammar Trainer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JLPT N4 Grammar Audio Course</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f7fb;
+      color: #222;
+      margin: 0;
+      padding: 16px;
+      line-height: 1.7;
+    }
 
-<style>
-body {
-    font-family: -apple-system, BlinkMacSystemFont;
-    background: #f5f5f5;
-    padding: 15px;
-}
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+    }
 
-.card {
-    background: white;
-    padding: 20px;
-    margin-bottom: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}
+    .header {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
 
-.grammar {
-    font-size: 28px;
-    font-weight: bold;
-    color: #222;
-}
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 28px;
+    }
 
-.section {
-    margin-top: 10px;
-}
+    .sub {
+      color: #666;
+      font-size: 14px;
+    }
 
-button {
-    margin-top: 10px;
-    padding: 10px;
-    border: none;
-    border-radius: 8px;
-    background: #007AFF;
-    color: white;
-    font-size: 16px;
-}
+    .controls {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      border-top: 1px solid #ddd;
+      padding: 12px;
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+      z-index: 20;
+    }
 
-.output {
-    margin-top: 10px;
-    display: none;
-    color: #333;
-}
-</style>
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 15px;
+      cursor: pointer;
+      background: #007aff;
+      color: white;
+    }
 
+    button.secondary {
+      background: #5c677d;
+    }
+
+    button.danger {
+      background: #d9534f;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border: 2px solid transparent;
+    }
+
+    .card.active {
+      border-color: #007aff;
+      background: #f8fbff;
+    }
+
+    .grammar {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-weight: 700;
+      margin-top: 14px;
+      margin-bottom: 4px;
+      color: #0b5cab;
+    }
+
+    .example {
+      background: #f8f9fc;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 8px;
+    }
+
+    .example-ja {
+      font-weight: 600;
+    }
+
+    .example-zh {
+      color: #555;
+      margin-top: 2px;
+    }
+
+    .status {
+      text-align: center;
+      font-size: 14px;
+      color: #555;
+      margin-top: 10px;
+    }
+
+    .small {
+      color: #777;
+      font-size: 13px;
+    }
+  </style>
 </head>
-
 <body>
+  <div class="container">
+    <div class="header">
+      <h1>JLPT N4 Grammar Audio Course</h1>
+      <div class="sub">
+        课程型语法页面｜适合通勤听讲解｜支持停止并记住位置
+      </div>
+      <div class="status" id="statusText">当前未播放</div>
+      <div class="small" id="resumeInfo">上次记录位置：无</div>
+    </div>
 
-<h2>JLPT N4 Grammar Trainer</h2>
+    <div id="cardsContainer"></div>
 
-<!-- Card Template -->
+    <div class="controls">
+      <button onclick="playCurrent()">▶ 播放当前</button>
+      <button onclick="playAllFromCurrent()">⏭ 从当前连续播放</button>
+      <button class="secondary" onclick="pauseSpeech()">⏸ 暂停</button>
+      <button class="danger" onclick="stopSpeech()">⏹ 停止并记录</button>
+      <button class="secondary" onclick="resumeLastPosition()">▶ 继续上次位置</button>
+      <button class="secondary" onclick="prevCard()">⬅ 上一个</button>
+      <button class="secondary" onclick="nextCard()">➡ 下一个</button>
+    </div>
+  </div>
 
-<div class="card">
-<div class="grammar">〜てしまう</div>
+  <script>
+    const grammarData = [
+      {
+        grammar: "〜ている",
+        explanation: "表示现在进行时；也可以表示动作结果形成后的持续状态。",
+        note: "使用时要注意，不是所有动词都只表示“正在做”。例如「結婚しています」不是“正在结婚”，而是“已婚状态”。",
+        structure: "Vて + いる",
+        examples: [
+          { ja: "今、本を読んでいます。", zh: "现在正在读书。" },
+          { ja: "田中さんは結婚しています。", zh: "田中先生已经结婚了，处于已婚状态。" },
+          { ja: "雨が降っています。", zh: "现在正在下雨。" }
+        ]
+      },
+      {
+        grammar: "〜てみる",
+        explanation: "表示尝试做某事，看看结果如何。",
+        note: "这里的「みる」不是单纯的“看”，而是补助动词，表示“试着做”。",
+        structure: "Vて + みる",
+        examples: [
+          { ja: "日本料理を食べてみます。", zh: "试着吃一下日本料理。" },
+          { ja: "この服を着てみました。", zh: "试着穿了这件衣服。" },
+          { ja: "もう一度やってみてください。", zh: "请再试一次。" }
+        ]
+      },
+      {
+        grammar: "〜てしまう",
+        explanation: "表示动作做完了；也常带有遗憾、后悔或不小心的语气。",
+        note: "要注意区分单纯过去式和「〜てしまう」。后者往往带有完成感或遗憾感。",
+        structure: "Vて + しまう",
+        examples: [
+          { ja: "宿題を忘れてしまいました。", zh: "把作业给忘了，很遗憾。" },
+          { ja: "ケーキを全部食べてしまった。", zh: "蛋糕全都吃完了。" },
+          { ja: "電車で寝てしまいました。", zh: "在电车上不小心睡着了。" }
+        ]
+      },
+      {
+        grammar: "〜ておく",
+        explanation: "表示事先做某事，为将来做准备；也可以表示让某状态先保持着。",
+        note: "重点不是动作本身，而是“为了后面方便，先这样处理”。",
+        structure: "Vて + おく",
+        examples: [
+          { ja: "会議の前に資料をコピーしておきます。", zh: "在会议前先把资料复印好。" },
+          { ja: "旅行の前にホテルを予約しておきました。", zh: "旅行前已经先把酒店订好了。" },
+          { ja: "窓を開けておいてください。", zh: "请先把窗户开着。" }
+        ]
+      },
+      {
+        grammar: "〜つもりです",
+        explanation: "表示说话人主观上的打算、意图。",
+        note: "这个语法偏主观意志；如果是客观安排或既定计划，常常更适合用「予定です」。",
+        structure: "V辞書形 + つもりです / Vない形 + つもりです",
+        examples: [
+          { ja: "来年、日本へ留学するつもりです。", zh: "我打算明年去日本留学。" },
+          { ja: "今日は早く寝るつもりです。", zh: "我今天打算早点睡。" },
+          { ja: "たばこはもう吸わないつもりです。", zh: "我打算不再抽烟了。" }
+        ]
+      }
+    ];
 
-<div class="section"><b>Meaning:</b> 完成 / 遗憾</div>
-<div class="section"><b>Structure:</b> Vて + しまう</div>
+    let currentIndex = 0;
+    let autoPlay = false;
+    let paused = false;
+    const storageKey = "jlpt_grammar_last_position";
 
-<div class="section">
-<b>Examples:</b><br>
-宿題を忘れてしまいました<br>
-ケーキを全部食べてしまった<br>
-電車で寝てしまいました
-</div>
+    function renderCards() {
+      const container = document.getElementById("cardsContainer");
+      container.innerHTML = "";
 
-<button onclick="playAudio('teShimau')">▶ 播放音频</button>
+      grammarData.forEach((item, index) => {
+        const card = document.createElement("div");
+        card.className = "card" + (index === currentIndex ? " active" : "");
+        card.id = `card-${index}`;
 
-<button onclick="toggleOutput(this)">👉 我来造句</button>
-<div class="output">
-请造句：<br>
-1️⃣ 完成含义<br>
-2️⃣ 遗憾含义
-</div>
-</div>
+        card.innerHTML = `
+          <div class="grammar">${index + 1}. ${item.grammar}</div>
 
-<div class="card">
-<div class="grammar">〜てみる</div>
+          <div class="section-title">中文讲解</div>
+          <div>${item.explanation}</div>
 
-<div class="section"><b>Meaning:</b> 尝试做</div>
-<div class="section"><b>Structure:</b> Vて + みる</div>
+          <div class="section-title">使用注意</div>
+          <div>${item.note}</div>
 
-<div class="section">
-<b>Examples:</b><br>
-日本料理を食べてみます<br>
-この服を着てみました<br>
-やってみてください
-</div>
+          <div class="section-title">Structure</div>
+          <div>${item.structure}</div>
 
-<button onclick="playAudio('temiru')">▶ 播放音频</button>
+          <div class="section-title">Examples</div>
+          ${item.examples.map(ex => `
+            <div class="example">
+              <div class="example-ja">${ex.ja}</div>
+              <div class="example-zh">${ex.zh}</div>
+            </div>
+          `).join("")}
 
-<button onclick="toggleOutput(this)">👉 我来造句</button>
-<div class="output">
-请造句：<br>
-1️⃣ 吃/用东西<br>
-2️⃣ 学习相关
-</div>
-</div>
+          <div style="margin-top:12px;">
+            <button onclick="setCurrent(${index}); playCurrent();">▶ 播放这一条</button>
+          </div>
+        `;
 
-<div class="card">
-<div class="grammar">〜ている</div>
+        container.appendChild(card);
+      });
 
-<div class="section"><b>Meaning:</b> 正在 / 状态</div>
-<div class="section"><b>Structure:</b> Vて + いる</div>
-
-<div class="section">
-<b>Examples:</b><br>
-本を読んでいます<br>
-結婚しています<br>
-雨が降っています
-</div>
-
-<button onclick="playAudio('teiru')">▶ 播放音频</button>
-
-<button onclick="toggleOutput(this)">👉 我来造句</button>
-<div class="output">
-请造句：<br>
-1️⃣ 动作进行<br>
-2️⃣ 状态
-</div>
-</div>
-
-<script>
-function playAudio(type) {
-    let text = "";
-
-    if(type === 'teShimau'){
-        text = "てしまう。完成或者遗憾。宿題を忘れてしまいました。ケーキを食べてしまった。電車で寝てしまいました。";
+      updateResumeInfo();
+      scrollToCurrent();
     }
 
-    if(type === 'temiru'){
-        text = "てみる。尝试做某事。日本料理を食べてみます。この服を着てみました。やってみてください。";
+    function setCurrent(index) {
+      currentIndex = index;
+      renderCards();
+      savePosition();
     }
 
-    if(type === 'teiru'){
-        text = "ている。正在进行或者状态。本を読んでいます。結婚しています。雨が降っています。";
+    function scrollToCurrent() {
+      const el = document.getElementById(`card-${currentIndex}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }
 
-    let speech = new SpeechSynthesisUtterance(text);
-    speech.lang = "ja-JP";
-    speech.rate = 0.9;
-    speechSynthesis.speak(speech);
-}
+    function buildSpeechText(item) {
+      let text = `${item.grammar}。`;
+      text += `${item.explanation}。`;
+      text += `使用时要注意，${item.note}。`;
+      text += `句型结构是，${item.structure}。`;
 
-function toggleOutput(btn){
-    let output = btn.nextElementSibling;
-    output.style.display = output.style.display === "block" ? "none" : "block";
-}
-</script>
+      item.examples.forEach((ex, i) => {
+        text += `例句${i + 1}。${ex.ja}。中文意思是，${ex.zh}。`;
+      });
 
+      return text;
+    }
+
+    function playCurrent() {
+      speechSynthesis.cancel();
+      paused = false;
+      autoPlay = false;
+
+      const item = grammarData[currentIndex];
+      const text = buildSpeechText(item);
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ja-JP";
+      utterance.rate = 0.9;
+
+      utterance.onstart = () => {
+        document.getElementById("statusText").innerText =
+          `正在播放：${currentIndex + 1}. ${item.grammar}`;
+      };
+
+      utterance.onend = () => {
+        document.getElementById("statusText").innerText =
+          `播放完成：${currentIndex + 1}. ${item.grammar}`;
+      };
+
+      speechSynthesis.speak(utterance);
+      savePosition();
+    }
+
+    function playAllFromCurrent() {
+      speechSynthesis.cancel();
+      paused = false;
+      autoPlay = true;
+      playSequence(currentIndex);
+    }
+
+    function playSequence(index) {
+      if (!autoPlay || index >= grammarData.length) {
+        document.getElementById("statusText").innerText = "连续播放已结束";
+        return;
+      }
+
+      currentIndex = index;
+      renderCards();
+      savePosition();
+
+      const item = grammarData[index];
+      const text = buildSpeechText(item);
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ja-JP";
+      utterance.rate = 0.9;
+
+      utterance.onstart = () => {
+        document.getElementById("statusText").innerText =
+          `连续播放中：${index + 1}. ${item.grammar}`;
+      };
+
+      utterance.onend = () => {
+        if (autoPlay) {
+          playSequence(index + 1);
+        }
+      };
+
+      speechSynthesis.speak(utterance);
+    }
+
+    function pauseSpeech() {
+      if (speechSynthesis.speaking && !speechSynthesis.paused) {
+        speechSynthesis.pause();
+        paused = true;
+        document.getElementById("statusText").innerText = "已暂停";
+      } else if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+        paused = false;
+        document.getElementById("statusText").innerText = "继续播放中";
+      }
+    }
+
+    function stopSpeech() {
+      autoPlay = false;
+      speechSynthesis.cancel();
+      savePosition();
+      document.getElementById("statusText").innerText =
+        `已停止，并记录在第 ${currentIndex + 1} 条`;
+    }
+
+    function nextCard() {
+      if (currentIndex < grammarData.length - 1) {
+        currentIndex++;
+        renderCards();
+        savePosition();
+      }
+    }
+
+    function prevCard() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        renderCards();
+        savePosition();
+      }
+    }
+
+    function savePosition() {
+      localStorage.setItem(storageKey, JSON.stringify({ index: currentIndex }));
+      updateResumeInfo();
+    }
+
+    function updateResumeInfo() {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      const resumeInfo = document.getElementById("resumeInfo");
+
+      if (saved && typeof saved.index === "number") {
+        const item = grammarData[saved.index];
+        resumeInfo.innerText = `上次记录位置：第 ${saved.index + 1} 条 ${item.grammar}`;
+      } else {
+        resumeInfo.innerText = "上次记录位置：无";
+      }
+    }
+
+    function resumeLastPosition() {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+      if (saved && typeof saved.index === "number") {
+        currentIndex = saved.index;
+        renderCards();
+        playCurrent();
+      }
+    }
+
+    renderCards();
+  </script>
 </body>
 </html>
